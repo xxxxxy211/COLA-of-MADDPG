@@ -16,7 +16,7 @@ class Vehicle:
         self.position = start_position
         self.direction = start_direction
         self.velocity = velocity
-        self.destinations = []
+        self.neighbors = []
 
 
 class Mode_4_in_3GPP(MultiAgentEnv):
@@ -42,7 +42,7 @@ class Mode_4_in_3GPP(MultiAgentEnv):
             carry_frequency=2,
             resource_blocks=4,
             bandwidth=1,
-            power_levels=(23, 10, 5, -100),
+            V2V_power_levels=(23, 10, 5, -100),
             sig2_dB=-114,
             V2V_decorrelation_distance=10,
             V2V_shadow_std=3,
@@ -50,7 +50,9 @@ class Mode_4_in_3GPP(MultiAgentEnv):
             V2I_decorrelation_distance=50,
             V2I_shadow_std=8,
             payload_size=1060,
-            time_budget=100,
+            time_budget=0.1,
+            V2I_power=23,
+            time_fast=0.001,
             seed=7777,
     ):
         # map_args:
@@ -76,8 +78,8 @@ class Mode_4_in_3GPP(MultiAgentEnv):
         # V2X_args
         self.carry_frequency = carry_frequency
         self.resource_blocks = resource_blocks
-        self.bandwidth = bandwidth
-        self.power_levels = power_levels
+        self.bandwidth = bandwidth * int(1e6)
+        self.V2V_power_levels = np.array(V2V_power_levels)
         self.sig2_dB = sig2_dB
         #  V2V_args
         self.V2V_decorrelation_distance = V2V_decorrelation_distance
@@ -86,14 +88,17 @@ class Mode_4_in_3GPP(MultiAgentEnv):
         #  V2I_args
         self.V2I_decorrelation_distance = V2I_decorrelation_distance
         self.V2I_shadow_std = V2I_shadow_std
-        self.payload_size = payload_size
+        self.payload_size = payload_size * 8
         self.time_budget = time_budget
+        self.V2I_power = V2I_power
+        self.time_fast = time_fast
         self.seed = seed
+        np.random.seed(self.seed)
 
         # compute useful args
         self.map_x_length = self.grid_x_length * self.grid_x_amount
         self.map_y_length = self.grid_y_length * self.grid_y_amount
-        self.time_slow = self.time_budget
+        self.time_slow = self.time_budget  # s
 
         # utils
         self.channel = None
@@ -103,20 +108,28 @@ class Mode_4_in_3GPP(MultiAgentEnv):
         self._init_vehicles()
         self._reset_payload()
         self._reset_time()
+        self._reactive_ants()
         self.channel = Channel(self.vehicles,
                                self.delta_distance,
+                               self.bs_position_x,
+                               self.bs_position_y,
+                               self.bs_ant_height,
+                               self.bs_ant_gain,
+                               self.bs_noise_figure,
                                self.veh_amount,
-                               self.neighbor_amount,
-                               self.resource_blocks,
-                               self.carry_frequency,
                                self.veh_ant_height,
+                               self.veh_ant_gain,
+                               self.veh_noise_figure,
+                               self.carry_frequency,
+                               self.resource_blocks,
+                               self.bandwidth,
+                               self.sig2_dB,
                                self.V2V_decorrelation_distance,
                                self.V2V_shadow_std,
-                               self.bs_ant_height,
+                               self.neighbor_amount,
                                self.V2I_decorrelation_distance,
                                self.V2I_shadow_std,
-                               self.bs_position_x,
-                               self.bs_position_y
+                               self.seed,
                                )
 
     def _init_map(self):
@@ -185,6 +198,9 @@ class Mode_4_in_3GPP(MultiAgentEnv):
 
     def _reset_time(self):
         self.remain_time = self.time_budget
+
+    def _reactive_ants(self):
+        self.is_active = np.ones((self.veh_amount, self.neighbor_amount), dtype='bool')
 
     def _renew_positions(self):
         # 论文作者给出的位置更新函数，基于该函数可以得到与论文相对接近的结果
@@ -316,15 +332,27 @@ class Mode_4_in_3GPP(MultiAgentEnv):
             i += 1
 
     def get_action_space(self):
-        return list(range(0, self.resource_blocks * len(self.power_levels)))
+        return list(range(0, self.resource_blocks * len(self.V2V_power_levels)))
 
     def _get_agents_actions(self, action: np.ndarray):
-        """:return: np.ndarray, [agent_id, neighbor_id, power_dB]"""
-        block_select = action % self.resource_blocks
-        power_select = np.array(self.power_levels)[action / self.resource_blocks]
+        block_id = action % self.resource_blocks
+        power = self.V2V_power_levels[action / self.resource_blocks]
+        return block_id, power
 
     def step(self, actions):
-        pass
+        block_id, power = self._get_agents_actions(actions)
+        V2V_rate = self.channel.get_V2V_rate(self.is_active, block_id, power, self.V2I_power)
+        V2I_rate = self.channel.get_V2I_rate(self.is_active, block_id, power, self.V2I_power)
+        self.remain_payload -= (V2V_rate * self.time_slow * self.bandwidth).astype('int32')
+        self.remain_payload[self.remain_payload < 0] = 0
+        self.remain_time -= self.time_fast
+
+        reward_elements = V2V_rate / 10
+        reward_elements[self.remain_payload <= 0] = 1
+        self.is_active[np.multiply(self.is_active, self.remain_payload <= 0)] = 0
+        l = 0.1
+        reward = l * np.sum(V2I_rate) / (self.veh_amount * 10) + (1 - l) * np.sum(reward_elements) / (self.veh_amount * self.neighbor_amount)
+        return reward, self.remain_time == 0, ""
 
     def get_obs(self):
         pass

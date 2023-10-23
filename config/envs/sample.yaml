@@ -28,19 +28,22 @@ env_args:
   carry_frequency: 2 #GHz
   resource_blocks: 4
   bandwidth: 1 #MHz
-  power_levels: (23,10,5,-100) # dB
+
   sig2_dB : -114 #dB
 
   #  V2V_args
   V2V_decorrelation_distance: 10 #m
   V2V_shadow_std: 3 #dB
   neighbor_amount: 1
+  V2V_power_levels: (23,10,5,-100) # dB
 
   #  V2I_args
   V2I_decorrelation_distance: 50 #m
   V2I_shadow_std: 8 #dB
   payload_size: 1060 #byte
-  time_budget: 100 #ms
+  time_budget: 0.1 #s
+  V2I_power: 23 #dB
 
+  time_fast: 0.001
   seed: 7777
 
