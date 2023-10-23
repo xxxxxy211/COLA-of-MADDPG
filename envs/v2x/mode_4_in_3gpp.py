@@ -38,10 +38,12 @@ class Mode_4_in_3GPP(MultiAgentEnv):
             veh_ant_height=1.5,
             veh_ant_gain=3,
             veh_noise_figure=9,
-            veh_velocity="absolute,36,m/s",
+            veh_velocity="10-15,m/s",
             carry_frequency=2,
             resource_blocks=4,
             bandwidth=1,
+            power_levels=(23, 10, 5, -100),
+            sig2_dB=-114,
             V2V_decorrelation_distance=10,
             V2V_shadow_std=3,
             neighbor_amount=1,
@@ -75,6 +77,8 @@ class Mode_4_in_3GPP(MultiAgentEnv):
         self.carry_frequency = carry_frequency
         self.resource_blocks = resource_blocks
         self.bandwidth = bandwidth
+        self.power_levels = power_levels
+        self.sig2_dB = sig2_dB
         #  V2V_args
         self.V2V_decorrelation_distance = V2V_decorrelation_distance
         self.V2V_shadow_std = V2V_shadow_std
@@ -311,6 +315,13 @@ class Mode_4_in_3GPP(MultiAgentEnv):
 
             i += 1
 
+    def get_action_space(self):
+        return list(range(0, self.resource_blocks * len(self.power_levels)))
+
+    def _get_agents_actions(self, action: np.ndarray):
+        """:return: np.ndarray, [agent_id, neighbor_id, power_dB]"""
+        block_select = action % self.resource_blocks
+        power_select = np.array(self.power_levels)[action / self.resource_blocks]
 
     def step(self, actions):
         pass

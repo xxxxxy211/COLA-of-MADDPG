@@ -1,7 +1,7 @@
 env: sample
 
 env_args:
-#map_args:
+  #map_args:
   map_shape: "rectangle"
   grid_x_length: 250 #m
   grid_y_length: 433 #m
@@ -10,33 +10,35 @@ env_args:
   grid_x_amount: 3
   grid_y_amount: 3
 
-#bs_args:
+  #bs_args:
   bs_position_x: 375 #m
   bs_position_y: 649.5 #m
   bs_ant_height: 25 #m
   bs_ant_gain: 8 #dB
   bs_noise_figure: 5 # dB
 
-#veh_args:
+  #veh_args:
   veh_amount: 4
   veh_ant_height: 1.5 #m
   veh_ant_gain: 3 #dB
   veh_noise_figure: 9 #dB
   veh_velocity: "10-15,m/s"
 
-#V2X_args
+  #V2X_args
   carry_frequency: 2 #GHz
   resource_blocks: 4
   bandwidth: 1 #MHz
+  power_levels: (23,10,5,-100) # dB
+  sig2_dB : -114 #dB
 
-#  V2V_args
+  #  V2V_args
   V2V_decorrelation_distance: 10 #m
-  V2V_shadow_std: 3
+  V2V_shadow_std: 3 #dB
   neighbor_amount: 1
 
-#  V2I_args
+  #  V2I_args
   V2I_decorrelation_distance: 50 #m
-  V2I_shadow_std: 8
+  V2I_shadow_std: 8 #dB
   payload_size: 1060 #byte
   time_budget: 100 #ms
 
